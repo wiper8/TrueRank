@@ -93,5 +93,3 @@ lapply(players, marginal_per_player)
 
 show_ranking_history(scores)
 
-#combien de fois plus lent une partie de double que de simple
-(dim_len_mu * dim_len_sig * dim_len_F_2vs2)^4 / (dim_len_mu * dim_len_sig * dim_len_F_1vs1)^2

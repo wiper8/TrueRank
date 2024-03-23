@@ -33,26 +33,18 @@ show_current_detailed_ranking <- function(players) {
   ranks <- ranks[order(ranks, decreasing = TRUE)]
   print(ranks)
   
-  x <- 0:100
-  
-  likely <- lapply(players, function(distr) apply(apply(distr, 1, function(d) dnorm(x, d[1], d[2]) * d[3]), 1, sum))
-  likely <- lapply(likely, function(x) x/sum(x)) 
-  
   graph_data <- data.frame(
     score = ranks,
     player = names(ranks)
   )
   
-  graph_data2 <- data.frame(
-    score = rep(x, length(likely)),
-    likelihood = unlist(likely),
-    player = rep(names(likely), each = length(x))
-  )
+  graph_data2 <- do.call(rbind, mapply(function(x, n) data.frame(x, "player"=n), players, names(players), SIMPLIFY = FALSE))
   
   ggplot()+
     geom_vline(aes(xintercept = score, col = player), data=graph_data, linewidth=2)+
-    geom_line(aes(x=score, y=likelihood, col = player), data = graph_data2,
+    geom_line(aes(x=mu, y=p, col = player), data = graph_data2,
               linewidth=1, alpha=0.8)+
+    xlab("Score")+ylab("Likelihood")+
     theme_bw()+
     xlim(0, 100)
   
