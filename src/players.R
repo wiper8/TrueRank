@@ -1,3 +1,15 @@
+#TODO améliorer la précision des dimensions (dim_len plus grands)
+#TODO accélérer le code encore une fois
+#TODO possiblement flusher des valeurs quasi-impossibles par personne
+#TODO améliorer la modélisation du 2vs2. Possiblement refaire le système partiellement s'il faut modéliser les probs par coups.
+#TODO ajouter possible drift dans le temps
+#TODO que faire si qqun arrête de jouer pendant un bout.
+#TODO shiny app?
+#TODO excel partagé et trouver une manière de s'assurer que ce soit de bonnes données
+#TODO se questionner si le score des gens devrait varier si les autres jouent en leur absence.
+#TODO vérifier si l'ordonnancement des parties a un impact.
+
+
 players <- list()
 
 dim_len_mu <- 25
@@ -13,8 +25,8 @@ init_distr <- function() {
 
 distr_simplifier_1vs1 <- function(distr1, distr2) {
   
-  flush1 <- distr1[, "p"] < 1 / nrow(distr1) / 10
-  flush2 <- distr2[, "p"] < 1 / nrow(distr2) / 10
+  flush1 <- distr1[, "p"] < 1 / nrow(distr1) / 12
+  flush2 <- distr2[, "p"] < 1 / nrow(distr2) / 12
   
   new_dim_len_mu <- max(length(unique(distr1[!flush1, "mu"])),
                         length(unique(distr2[!flush2, "mu"])))
@@ -35,10 +47,10 @@ distr_simplifier_1vs1 <- function(distr1, distr2) {
 
 distr_simplifier_2vs2 <- function(distrA1, distrA2, distrB1, distrB2) {
   
-  flushA1 <- distrA1[, "p"] < 1 / nrow(distrA1) / 10
-  flushA2 <- distrA2[, "p"] < 1 / nrow(distrA2) / 10
-  flushB1 <- distrB1[, "p"] < 1 / nrow(distrB1) / 10
-  flushB2 <- distrB2[, "p"] < 1 / nrow(distrB2) / 10
+  flushA1 <- distrA1[, "p"] < 1 / nrow(distrA1) / 12
+  flushA2 <- distrA2[, "p"] < 1 / nrow(distrA2) / 12
+  flushB1 <- distrB1[, "p"] < 1 / nrow(distrB1) / 12
+  flushB2 <- distrB2[, "p"] < 1 / nrow(distrB2) / 12
   
   new_dim_len_mu <- max(length(unique(distrA1[!flushA1, "mu"])),
                         length(unique(distrA2[!flushA2, "mu"])),
@@ -70,6 +82,7 @@ distr_simplifier_2vs2 <- function(distrA1, distrA2, distrB1, distrB2) {
        dim_mu = new_dim_len_mu, keepA1 = keepA1, keepA2 = keepA2, keepB1 = keepB1, keepB2 = keepB2)
 }
 
+#TODO
 distr_simplifier_ALL <- function(players) {
   
   flush <- lapply(players, function(distr) {
@@ -77,8 +90,6 @@ distr_simplifier_ALL <- function(players) {
   })
   
   new_dim_len_mu <- max(mapply(function(distr, flush) length(unique(distr[!flush, "mu"])), players, flush))
-  
-  #TODO vérifier le précédent
   
   #sigma ne sera quasiement jamais simplifié à cause de la variance inhérente à la negbin.
   

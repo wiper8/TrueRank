@@ -13,9 +13,18 @@ show_current_ranking <- function(players) {
   )
   
   ggplot()+
-    geom_vline(aes(xintercept = score, col = player), data=graph_data, size=2)+
+    geom_vline(aes(xintercept = score, col = player), data=graph_data, linewidth=2)+
     theme_bw()+
     xlim(0, 100)
+}
+
+show_current_probs <- function(players) {
+  ranks <- sapply(players, calculate_ranking)
+  ranks <- ranks[order(ranks, decreasing = TRUE)]
+  n <- length(ranks) * (length(ranks)-1) / 2
+  pairs <- t(combn(1:4, 2))
+  
+  data.frame(A=names(ranks)[pairs[, 1]], B=names(ranks)[pairs[, 2]], prob=round(ranks[pairs[, 1]] / apply(cbind(ranks[pairs[, 1]], ranks[pairs[, 2]]), 1, sum), 3))
 }
 
 show_current_detailed_ranking <- function(players) {
@@ -41,9 +50,9 @@ show_current_detailed_ranking <- function(players) {
   )
   
   ggplot()+
-    geom_vline(aes(xintercept = score, col = player), data=graph_data, size=2)+
+    geom_vline(aes(xintercept = score, col = player), data=graph_data, linewidth=2)+
     geom_line(aes(x=score, y=likelihood, col = player), data = graph_data2,
-              size=1, alpha=0.8)+
+              linewidth=1, alpha=0.8)+
     theme_bw()+
     xlim(0, 100)
   
@@ -76,7 +85,8 @@ show_ranking_history <- function(scores) {
   }
   
   ggplot(graph_data)+
-    geom_line(aes(x=date, y=score, col=player), size=1)+
+    geom_line(aes(x=date, y=score, col=player), linewidth=1)+
+    geom_point(aes(x=date, y=score, col=player))+
     theme_bw()
   
 }

@@ -34,15 +34,21 @@ post_marginal_per_player <- function(posteriori) {
 }
 
 distr_F_finder <- function(distr_mu_sig, dim_len_F) {
-  distr_F <- apply(
-    distr_mu_sig,
-    1,
-    function(x) cbind("mu"=x[1],
-                      "sig"=x[2],
-                      "F"=pmax(1, qnorm(seq(0 + 1/(dim_len_F+1), 1 - 1/(dim_len_F+1), length.out = dim_len_F), x[1], x[2])),
-                      p=1/dim_len_F),
-    simplify = F
-  )
+  distr_F <- lapply(split(distr_mu_sig, 1:nrow(distr_mu_sig)), function(x) {
+    cbind("mu"=x[, 1],
+          "sig"=x[, 2],
+          "F"=pmax(1, qnorm(seq(0 + 1/(dim_len_F+1), 1 - 1/(dim_len_F+1), length.out = dim_len_F), x[, 1], x[, 2])),
+          p=1/dim_len_F)
+  })
+  # distr_F <- apply(
+  #   distr_mu_sig,
+  #   1,
+  #   function(x) cbind("mu"=x[1],
+  #                     "sig"=x[2],
+  #                     "F"=pmax(1, qnorm(seq(0 + 1/(dim_len_F+1), 1 - 1/(dim_len_F+1), length.out = dim_len_F), x[1], x[2])),
+  #                     p=1/dim_len_F),
+  #   simplify = F #argument disparu en R 4.0.0? ou pas encore existant en 4.0.0?
+  # )
   
   do.call(rbind, mapply(
     function(x, y) cbind("mu"=y[, "mu"], "sig" = y[, "sig"],
@@ -96,13 +102,52 @@ distr_P_1vs1 <- function(distr_F1_F2) {
   )
 }
 
-
+#TODO réfléchir a si c'est vraiment le calcul que je veux
+#présentement c'est l'équivalent à dire chq point sont en 1vs1, mais on alternes les possibilitées
 distr_P_2vs2 <- function(distr_F1_F2) {
   cbind(distr_F1_F2, 
         "P" = (distr_F1_F2[, "FA1"] / (distr_F1_F2[, "FA1"] + distr_F1_F2[, "FB1"]) + distr_F1_F2[, "FA2"] / (distr_F1_F2[, "FA2"] + distr_F1_F2[, "FB1"]) +
      distr_F1_F2[, "FA1"] / (distr_F1_F2[, "FA1"] + distr_F1_F2[, "FB2"]) + distr_F1_F2[, "FA2"] / (distr_F1_F2[, "FA2"] + distr_F1_F2[, "FB2"])) / 4
   )
 }
+
+#en 1vs1 ex will 0.2win 0.65 tie 0.15 loss
+#phil 0.1win 0.5tie 0.4loss
+#P(will win pt) = 0.5 * (0.2 + 0.65*0.4 + 0.65*0.5*0.2 + 0.65*0.5*0.65*0.4 + 0.65*0.5*0.65*0.5*0.2 + 0.65*0.5*0.65*0.5*0.65*0.4 + ...) +
+#   +0.5 * (0.4 + 0.5*0.2 + 0.5*0.65*0.4 + 0.5*0.65*0.5*0.2 + 0.5*0.65*0.5*0.65*0.4 + ...)
+# = 0.5 * [ 0.2sum_0^inf (0.65*0.5)^i  + 0.4*0.65sum_0^inf (0.5*0.65)^i + 0.4sum_0^inf (0.5*0.65)^i + 0.2*0.5sum_0 (0.5*0.65)^i]
+# = 0.5 * (0.2*(1+0.5) + 0.4*(1+0.65)) / (1-0.65*0.5)
+# = 0.7111
+
+#si on suppose que les games en simple durent 5 coups en moyenne
+# 0.5 * (1*0.2 + 2*0.65*0.4 + 3*0.65*0.5*0.2 + 4*0.65*0.5*0.65*0.4 + 5*0.65*0.5*0.65*0.5*0.2 + 6*0.65*0.5*0.65*0.5*0.65*0.4 + ...) +
+#   +0.5 * (1*0.4 + 2*0.5*0.2 + 3*0.5*0.65*0.4 + 4*0.5*0.65*0.5*0.2 + 5*0.5*0.65*0.5*0.65*0.4 + ...)
+#on sait que sum_0^inf [k*p^k] = p/(1-p)^2
+# = 0.5 * (0.2sum_0^inf (0.65*0.5)^i*(2i+1) + 0.4*0.65sum_0^inf (0.65*0.5)^i*(2i+2))
+# + 0.5 * (0.4sum_0^inf (0.5*0.65)^i*(2i+1) + 0.2*0.5sum_0^inf (0.65*0.5)^i*(2i+2))
+# = 0.5 * (0.2 / (1-0.65*0.5) + 2*0.2 * (0.65*0.5) / (1-0.65*0.5)^2 + 0.4*0.65*2/(1-0.65*0.5) + 0.4*0.65 * 2 / (1-0.65*0.5)^2 )
+# + 0.5 * (0.4 / (1-0.65*0.5) + 2*0.4 * (0.65*0.5) / (1-0.65*0.5)^2 + 0.2*0.5 * 2/(1-0.65*0.5) + 0.2*0.5 * 2 * (0.65*0.5) / (1-0.65*0.5)^2)
+# = 0.5 * (0.2 / (1-p) + 2*0.2 * p / (1-p)^2 + 0.4*0.65*2/(1-p) + 0.4*0.65 * 2 / (1-p)^2 )
+# + 0.5 * (0.4 / (1-p) + 2*0.4 * p / (1-p)^2 + 0.2*0.5 * 2/(1-p) + 0.2*0.5 * 2 * p / (1-p)^2)
+# = 0.5 * (0.2 / q * (1 + 2p/q) + 0.4*0.65*2/q * (1 + 1/q))
+# + 0.5 * (0.4 / q * (1 + 2p/q) + 0.2*0.5*2/q * (1 + 1/q))
+# = 0.5/q * [(0.2 * (1 + 2p/q) + 0.4*0.65*2 * (1 + 1/q)) + (0.4 * (1 + 2p/q) + 0.2*0.5*2 * (1 + 1/q))]
+# = 0.5/q * [(1 + 2p/q) * (0.2 + 0.4) + 2*(1 + 1/q) * (0.4*0.65 + 0.2*0.5)]
+p=0.65*0.5
+q=1-p
+0.5/q * ((1 + 2*p/q) * (0.2 + 0.4) + 2*(1 + 1/q) * (0.4*0.65 + 0.2*0.5))
+
+
+#en 1vs1 ex will 0.8sucess 0.2failed
+#phil 0.7success 0.3 failed
+
+#0.5 * (0.8 * 0.3 + 0.8 * 0.7 * 0.8 * 0.3 + 0.8 * 0.7 * 0.8 * 0.7 * 0.8 * 0.3 + ...)
+# = 0.5 * (0.3 + 0.7 * 0.8 * 0.3 + 0.7 * 0.8 * 0.7 * 0.8 * 0.3 + ...)
+# = 0.5 * (0.8*0.3/(1 - 0.8*0.7) + 0.3/(1-0.8*0.7))
+# = 0.3 * (0.8 + 1)/2 / (1 - 0.8*0.7)
+# = (1-p2) * (p + 1)/2 / (1 - p*p2)
+
+
 
 posteriori_1vs1 <- function(distr_mu_sig1, distr_mu_sig2, game_len, win,
                             dim_mu = dim_len_mu, dim_sig = dim_len_sig, dim_F = dim_len_F_1vs1) {
