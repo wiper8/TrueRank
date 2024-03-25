@@ -3,6 +3,7 @@ source("src/scores.R")
 source("src/update_scores.R")
 source("src/plots.R")
 
+
 scores <- scores_init()
 
 players <- list()
