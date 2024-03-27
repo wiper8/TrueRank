@@ -3,10 +3,6 @@ source("src/scores.R")
 source("src/update_scores.R")
 source("src/plots.R")
 
-dim_len_F_1vs1 <- 5
-dim_len_F_2vs2 <- 5
-dim_len_mu <- 2
-dim_len_sig <- 1
 game_len <- 7
 
 
@@ -21,8 +17,8 @@ players <- list("a" = matrix(
 distr_mu_sig1 <- players[[1]]
 distr_mu_sig2 <- players[[2]]
 
-distr_F1 <- distr_F_finder(distr_mu_sig1, dim_len_F_1vs1)
-distr_F2 <- distr_F_finder(distr_mu_sig2, dim_len_F_1vs1)
+distr_F1 <- distr_F_finder(distr_mu_sig1)
+distr_F2 <- distr_F_finder(distr_mu_sig2)
 
 stopifnot(all.equal(
   sort(apply(distr_F1_F2_1vs1(distr_F1, distr_F2), 1, prod)),
@@ -58,11 +54,11 @@ stopifnot(all.equal(
     Likelihood <- Likelihood/sum(Likelihood)
     Likelihood <- cbind(Likelihood, distr_P)
     
-    id <- rep(1:(dim_len_mu * dim_len_sig) * dim_len_F_1vs1, dim_len_mu * dim_len_sig)
-    id <- id + rep((seq(dim_len_mu * dim_len_sig)-1) * dim_len_mu * dim_len_sig * dim_len_F_1vs1^2, each = dim_len_mu * dim_len_sig)
+    id <- rep(1:(dim_len_mu) * dim_len_F_1vs1, dim_len_mu)
+    id <- id + rep((seq(dim_len_mu)-1) * dim_len_mu * dim_len_F_1vs1^2, each = dim_len_mu)
     
-    id2 <- rep(rep(rep(1:(dim_len_mu * dim_len_sig), each=dim_len_F_1vs1), dim_len_F_1vs1), dim_len_mu * dim_len_sig)
-    id2 <- id2 + rep((seq(dim_len_mu * dim_len_sig)-1) * (dim_len_mu * dim_len_sig), each = dim_len_mu * dim_len_sig * dim_len_F_1vs1^2)
+    id2 <- rep(rep(rep(1:(dim_len_mu), each=dim_len_F_1vs1), dim_len_F_1vs1), dim_len_mu)
+    id2 <- id2 + rep((seq(dim_len_mu)-1) * (dim_len_mu), each = dim_len_mu * dim_len_F_1vs1^2)
     
     posteriori <- cbind(
       Likelihood[id, c("mu1", "sig1", "mu2", "sig2")],
@@ -146,15 +142,15 @@ stopifnot(all.equal(
     Likelihood <- Likelihood/sum(Likelihood)
     Likelihood <- cbind(Likelihood, distr_P)
     
-    id <- rep(1:(dim_len_mu * dim_len_sig) * dim_len_F_2vs2, (dim_len_mu * dim_len_sig)^3)
-    id <- id + rep(rep((seq(dim_len_mu * dim_len_sig)-1) * dim_len_mu * dim_len_sig * dim_len_F_2vs2^2, each = dim_len_mu * dim_len_sig), (dim_len_mu * dim_len_sig)^2)
-    id <- id + rep(rep((seq(dim_len_mu * dim_len_sig)-1) * (dim_len_mu * dim_len_sig * dim_len_F_2vs2)^2 * dim_len_F_2vs2, each = (dim_len_mu * dim_len_sig)^2), dim_len_mu * dim_len_sig)
-    id <- id + rep((seq(dim_len_mu * dim_len_sig)-1) * (dim_len_mu * dim_len_sig * dim_len_F_2vs2)^3 * dim_len_F_2vs2, each = (dim_len_mu * dim_len_sig)^3)
+    id <- rep(1:(dim_len_mu) * dim_len_F_2vs2, (dim_len_mu)^3)
+    id <- id + rep(rep((seq(dim_len_mu)-1) * dim_len_mu * dim_len_F_2vs2^2, each = dim_len_mu), (dim_len_mu)^2)
+    id <- id + rep(rep((seq(dim_len_mu)-1) * (dim_len_mu * dim_len_F_2vs2)^2 * dim_len_F_2vs2, each = (dim_len_mu)^2), dim_len_mu)
+    id <- id + rep((seq(dim_len_mu)-1) * (dim_len_mu * dim_len_F_2vs2)^3 * dim_len_F_2vs2, each = (dim_len_mu)^3)
     
-    id2 <- rep(rep(1:(dim_len_mu * dim_len_sig), each=dim_len_F_2vs2), (dim_len_mu * dim_len_sig * dim_len_F_2vs2)^3)
-    id2 <- id2 + rep(rep((seq(dim_len_mu * dim_len_sig)-1) * (dim_len_mu * dim_len_sig), each = dim_len_mu * dim_len_sig * dim_len_F_2vs2^2), (dim_len_mu * dim_len_sig * dim_len_F_2vs2)^2)
-    id2 <- id2 + rep(rep((seq(dim_len_mu * dim_len_sig)-1) * (dim_len_mu * dim_len_sig)^2, each = (dim_len_mu * dim_len_sig * dim_len_F_2vs2)^2 * dim_len_F_2vs2), (dim_len_mu * dim_len_sig * dim_len_F_2vs2))
-    id2 <- id2 + rep((seq(dim_len_mu * dim_len_sig)-1) * (dim_len_mu * dim_len_sig)^3, each = (dim_len_mu * dim_len_sig * dim_len_F_2vs2)^3 * dim_len_F_2vs2)
+    id2 <- rep(rep(1:(dim_len_mu), each=dim_len_F_2vs2), (dim_len_mu * dim_len_F_2vs2)^3)
+    id2 <- id2 + rep(rep((seq(dim_len_mu)-1) * (dim_len_mu), each = dim_len_mu * dim_len_F_2vs2^2), (dim_len_mu * dim_len_F_2vs2)^2)
+    id2 <- id2 + rep(rep((seq(dim_len_mu)-1) * (dim_len_mu)^2, each = (dim_len_mu * dim_len_F_2vs2)^2 * dim_len_F_2vs2), (dim_len_mu * dim_len_F_2vs2))
+    id2 <- id2 + rep((seq(dim_len_mu)-1) * (dim_len_mu)^3, each = (dim_len_mu * dim_len_F_2vs2)^3 * dim_len_F_2vs2)
     
     posteriori <- cbind(
       Likelihood[id, c("muA1", "sigA1", "muA2", "sigA2", "muB1", "sigB1", "muB2", "sigB2")],

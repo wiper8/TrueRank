@@ -1,60 +1,28 @@
 library(data.table)
 
-dim_len_F_1vs1 <- 10
-dim_len_F_2vs2 <- 1
-
-calculate_ranking <- function(distr_mu_sig) {
-  round(sum(apply(distr_mu_sig, 1, function(x) x[1] - 2*x[2]) * distr_mu_sig[, "p"]), 1)
+calculate_skill <- function(distr_mu) {
+  round(sum(distr_mu[, "mu"] * distr_mu[, "p"]), 1)
 }
 
-marginal_per_player <- function(distr) {
-  distr <- setDT(as.data.frame(distr))
-  list(
-    as.data.frame(distr[, .(p=sum(p)), by = .(mu)]),
-    as.data.frame(distr[, .(p=sum(p)), by = .(sig)])
-  )
-}
 
 post_marginal_per_player <- function(posteriori) {
-  if(ncol(posteriori) == 5) {
+  if(ncol(posteriori) == 3) {
     posteriori <- setDT(as.data.frame(posteriori))
     list(
-      as.data.frame(posteriori[, .(p=sum(p)), by = .(mu1, sig1)][, .(mu=mu1, sig=sig1, p=p)]),
-      as.data.frame(posteriori[, .(p=sum(p)), by = .(mu2, sig2)][, .(mu=mu2, sig=sig2, p=p)])
+      as.data.frame(posteriori[, .(p=sum(p)), by = .(mu1)][, .(mu=mu1, p=p)]),
+      as.data.frame(posteriori[, .(p=sum(p)), by = .(mu2)][, .(mu=mu2, p=p)])
     )
   } else {
     posteriori <- setDT(as.data.frame(posteriori))
     list(
-      as.data.frame(posteriori[, .(p=sum(p)), by = .(muA1, sigA1)][, .(mu=muA1, sig=sigA1, p=p)]),
-      as.data.frame(posteriori[, .(p=sum(p)), by = .(muA2, sigA2)][, .(mu=muA2, sig=sigA2, p=p)]),
-      as.data.frame(posteriori[, .(p=sum(p)), by = .(muB1, sigB1)][, .(mu=muB1, sig=sigB1, p=p)]),
-      as.data.frame(posteriori[, .(p=sum(p)), by = .(muB2, sigB2)][, .(mu=muB2, sig=sigB2, p=p)])
+      as.data.frame(posteriori[, .(p=sum(p)), by = .(muA1)][, .(mu=muA1, p=p)]),
+      as.data.frame(posteriori[, .(p=sum(p)), by = .(muA2)][, .(mu=muA2, p=p)]),
+      as.data.frame(posteriori[, .(p=sum(p)), by = .(muB1)][, .(mu=muB1, p=p)]),
+      as.data.frame(posteriori[, .(p=sum(p)), by = .(muB2)][, .(mu=muB2, p=p)])
     )
   }
 }
 
-distr_F_finder <- function(distr_mu_sig, dim_len_F) {
-  distr_F <- lapply(split(distr_mu_sig, 1:nrow(distr_mu_sig)), function(x) {
-    cbind("mu"=x[, 1],
-          "sig"=x[, 2],
-          "F"=pmax(1, qnorm(seq(0 + 1/(dim_len_F+1), 1 - 1/(dim_len_F+1), length.out = dim_len_F), x[, 1], x[, 2])),
-          p=1/dim_len_F)
-  })
-  # distr_F <- apply(
-  #   distr_mu_sig,
-  #   1,
-  #   function(x) cbind("mu"=x[1],
-  #                     "sig"=x[2],
-  #                     "F"=pmax(1, qnorm(seq(0 + 1/(dim_len_F+1), 1 - 1/(dim_len_F+1), length.out = dim_len_F), x[1], x[2])),
-  #                     p=1/dim_len_F),
-  #   simplify = F #argument disparu en R 4.0.0? ou pas encore existant en 4.0.0?
-  # )
-  
-  do.call(rbind, mapply(
-    function(x, y) cbind("mu"=y[, "mu"], "sig" = y[, "sig"],
-                         "F"=x[, "F"], p=x[, "p"] * y[, "p"]),
-    x=distr_F, y=split.data.frame(as.data.frame(distr_mu_sig), 1:nrow(distr_mu_sig)), SIMPLIFY = F))
-}
 
 distr_F1_F2_1vs1 <- function(distr_F1, distr_F2) {
   
@@ -92,7 +60,7 @@ distr_F1_F2_2vs2 <- function(distr_FA1, distr_FA2, distr_FB1, distr_FB2) {
 }
 
 p_win_game_of <- function(p, g = 7) {
-  sapply(p, function(p) sum(dnbinom(0:(g-1), g, p)))
+  sapply(p, function(p_i) sum(dnbinom(0:(g-1), g, p_i)))
 }
 
 
@@ -111,161 +79,162 @@ distr_P_2vs2 <- function(distr_F1_F2) {
   )
 }
 
-#en 1vs1 ex will 0.2win 0.65 tie 0.15 loss
-#phil 0.1win 0.5tie 0.4loss
-#P(will win pt) = 0.5 * (0.2 + 0.65*0.4 + 0.65*0.5*0.2 + 0.65*0.5*0.65*0.4 + 0.65*0.5*0.65*0.5*0.2 + 0.65*0.5*0.65*0.5*0.65*0.4 + ...) +
-#   +0.5 * (0.4 + 0.5*0.2 + 0.5*0.65*0.4 + 0.5*0.65*0.5*0.2 + 0.5*0.65*0.5*0.65*0.4 + ...)
-# = 0.5 * [ 0.2sum_0^inf (0.65*0.5)^i  + 0.4*0.65sum_0^inf (0.5*0.65)^i + 0.4sum_0^inf (0.5*0.65)^i + 0.2*0.5sum_0 (0.5*0.65)^i]
-# = 0.5 * (0.2*(1+0.5) + 0.4*(1+0.65)) / (1-0.65*0.5)
-# = 0.7111
-
-#si on suppose que les games en simple durent 5 coups en moyenne
-# 0.5 * (1*0.2 + 2*0.65*0.4 + 3*0.65*0.5*0.2 + 4*0.65*0.5*0.65*0.4 + 5*0.65*0.5*0.65*0.5*0.2 + 6*0.65*0.5*0.65*0.5*0.65*0.4 + ...) +
-#   +0.5 * (1*0.4 + 2*0.5*0.2 + 3*0.5*0.65*0.4 + 4*0.5*0.65*0.5*0.2 + 5*0.5*0.65*0.5*0.65*0.4 + ...)
-#on sait que sum_0^inf [k*p^k] = p/(1-p)^2
-# = 0.5 * (0.2sum_0^inf (0.65*0.5)^i*(2i+1) + 0.4*0.65sum_0^inf (0.65*0.5)^i*(2i+2))
-# + 0.5 * (0.4sum_0^inf (0.5*0.65)^i*(2i+1) + 0.2*0.5sum_0^inf (0.65*0.5)^i*(2i+2))
-# = 0.5 * (0.2 / (1-0.65*0.5) + 2*0.2 * (0.65*0.5) / (1-0.65*0.5)^2 + 0.4*0.65*2/(1-0.65*0.5) + 0.4*0.65 * 2 / (1-0.65*0.5)^2 )
-# + 0.5 * (0.4 / (1-0.65*0.5) + 2*0.4 * (0.65*0.5) / (1-0.65*0.5)^2 + 0.2*0.5 * 2/(1-0.65*0.5) + 0.2*0.5 * 2 * (0.65*0.5) / (1-0.65*0.5)^2)
-# = 0.5 * (0.2 / (1-p) + 2*0.2 * p / (1-p)^2 + 0.4*0.65*2/(1-p) + 0.4*0.65 * 2 / (1-p)^2 )
-# + 0.5 * (0.4 / (1-p) + 2*0.4 * p / (1-p)^2 + 0.2*0.5 * 2/(1-p) + 0.2*0.5 * 2 * p / (1-p)^2)
-# = 0.5 * (0.2 / q * (1 + 2p/q) + 0.4*0.65*2/q * (1 + 1/q))
-# + 0.5 * (0.4 / q * (1 + 2p/q) + 0.2*0.5*2/q * (1 + 1/q))
-# = 0.5/q * [(0.2 * (1 + 2p/q) + 0.4*0.65*2 * (1 + 1/q)) + (0.4 * (1 + 2p/q) + 0.2*0.5*2 * (1 + 1/q))]
-# = 0.5/q * [(1 + 2p/q) * (0.2 + 0.4) + 2*(1 + 1/q) * (0.4*0.65 + 0.2*0.5)]
-p=0.65*0.5
-q=1-p
-0.5/q * ((1 + 2*p/q) * (0.2 + 0.4) + 2*(1 + 1/q) * (0.4*0.65 + 0.2*0.5))
-
-
-#en 1vs1 ex will 0.8sucess 0.2failed
-#phil 0.7success 0.3 failed
-
-#0.5 * (0.8 * 0.3 + 0.8 * 0.7 * 0.8 * 0.3 + 0.8 * 0.7 * 0.8 * 0.7 * 0.8 * 0.3 + ...)
-# = 0.5 * (0.3 + 0.7 * 0.8 * 0.3 + 0.7 * 0.8 * 0.7 * 0.8 * 0.3 + ...)
-# = 0.5 * (0.8*0.3/(1 - 0.8*0.7) + 0.3/(1-0.8*0.7))
-# = 0.3 * (0.8 + 1)/2 / (1 - 0.8*0.7)
-# = (1-p2) * (p + 1)/2 / (1 - p*p2)
-
-
-
-posteriori_1vs1 <- function(distr_mu_sig1, distr_mu_sig2, game_len, win,
-                            dim_mu = dim_len_mu, dim_sig = dim_len_sig, dim_F = dim_len_F_1vs1) {
-  
-  distr_F1 <- distr_F_finder(distr_mu_sig1, dim_F)
-  
-  distr_F2 <- distr_F_finder(distr_mu_sig2, dim_F)
-  
-  distr_F1_F2 <- distr_F1_F2_1vs1(distr_F1, distr_F2)
-  
-  distr_P <- distr_P_1vs1(distr_F1_F2)
-  
-  distr_P <- cbind(distr_P, "P_win" = p_win_game_of(distr_P[, "P"], game_len))
-  
-  Likelihood <- (distr_P[, "P_win"] * win + (1-distr_P[, "P_win"]) * (1-win)) * distr_P[, "p1"] * distr_P[, "p2"]
-  Likelihood <- Likelihood/sum(Likelihood)
-  Likelihood <- cbind(Likelihood, distr_P)
-  
-  id <- rep(1:(dim_mu * dim_sig) * dim_F, dim_mu * dim_sig)
-  id <- id + rep((seq(dim_mu * dim_sig)-1) * dim_mu * dim_sig * dim_F^2, each = dim_mu * dim_sig)
-  
-  id2 <- rep(rep(rep(1:(dim_mu * dim_sig), each=dim_F), dim_F), dim_mu * dim_sig)
-  id2 <- id2 + rep((seq(dim_mu * dim_sig)-1) * (dim_mu * dim_sig), each = dim_mu * dim_sig * dim_F^2)
-  
-  posteriori <- cbind(
-    Likelihood[id, c("mu1", "sig1", "mu2", "sig2")],
-    "p"=sapply(split(Likelihood[, "Likelihood"], id2), sum)
-  )
-  
-  posteriori
+transition_matrix <- function(skill, k = 3) {
+  P <- matrix(NA, nrow = k+1, ncol = k+1, dimnames = list(paste0("reçu F", 0:k), paste0("frappé F", 0:k)))
+  P[-1, ] <- t(sapply(1:k, function(ki) dbinom(0:k, k, skill * ((1 - ki) / (k - 1) + 1))))
+  P[1, k+1] <- 1
+  P[1, -(k+1)] <- 0
+  P
 }
 
-
-posteriori_2vs2 <- function(distr_mu_sigA1, distr_mu_sigA2,
-                            distr_mu_sigB1, distr_mu_sigB2,
-                            game_len, win,
-                            dim_mu = dim_len_mu, dim_sig = dim_len_sig, dim_F = dim_len_F_2vs2) {
+prob_win_point_1vs1_knowing_skills <- function(MA, MB, k = 3) {
   
-  distr_FA1 <- distr_F_finder(distr_mu_sigA1, dim_F)
+  M <- matrix(0, 2*nrow(MA), 2*ncol(MA), dimnames = list(
+    c(paste0("A ", rownames(MA)), paste0("B ", rownames(MB))),
+    c(paste0("B ", colnames(MA)), paste0("A ", colnames(MB)))
+  ))
+  M[1:nrow(MA), -1:-nrow(MA)] <- MA
+  M[-1:-nrow(MA), 1:nrow(MA)] <- MB
   
-  distr_FA2 <- distr_F_finder(distr_mu_sigA2, dim_F)
-  
-  distr_FB1 <- distr_F_finder(distr_mu_sigB1, dim_F)
-  
-  distr_FB2 <- distr_F_finder(distr_mu_sigB2, dim_F)
-  
-  distr_F1_F2 <- distr_F1_F2_2vs2(distr_FA1, distr_FA2, distr_FB1, distr_FB2)
-  
-  distr_P <- distr_P_2vs2(distr_F1_F2)
-  
-  distr_P <- cbind(distr_P, "P_win" = p_win_game_of(distr_P[, "P"], game_len))
-  
-  Likelihood <- (distr_P[, "P_win"] * win + (1-distr_P[, "P_win"]) * (1-win)) * distr_P[, "pA1"] * distr_P[, "pA2"] * distr_P[, "pB1"] * distr_P[, "pB2"]
-  Likelihood <- Likelihood/sum(Likelihood)
-  Likelihood <- cbind(Likelihood, distr_P)
-  
-  id <- rep(1:(dim_mu * dim_sig) * dim_F, (dim_mu * dim_sig)^3)
-  id <- id + rep(rep((seq(dim_mu * dim_sig)-1) * dim_mu * dim_sig * dim_F^2, each = dim_mu * dim_sig), (dim_mu * dim_sig)^2)
-  id <- id + rep(rep((seq(dim_mu * dim_sig)-1) * (dim_mu * dim_sig * dim_F)^2 * dim_F, each = (dim_mu * dim_sig)^2), dim_mu * dim_sig)
-  id <- id + rep((seq(dim_mu * dim_sig)-1) * (dim_mu * dim_sig * dim_F)^3 * dim_F, each = (dim_mu * dim_sig)^3)
-  
-  id2 <- rep(rep(1:(dim_mu * dim_sig), each=dim_F), (dim_mu * dim_sig * dim_F)^3)
-  id2 <- id2 + rep(rep((seq(dim_mu * dim_sig)-1) * (dim_mu * dim_sig), each = dim_mu * dim_sig * dim_F^2), (dim_mu * dim_sig * dim_F)^2)
-  id2 <- id2 + rep(rep((seq(dim_mu * dim_sig)-1) * (dim_mu * dim_sig)^2, each = (dim_mu * dim_sig * dim_F)^2 * dim_F), (dim_mu * dim_sig * dim_F))
-  id2 <- id2 + rep((seq(dim_mu * dim_sig)-1) * (dim_mu * dim_sig)^3, each = (dim_mu * dim_sig * dim_F)^3 * dim_F)
-  
-  posteriori <- cbind(
-    Likelihood[id, c("muA1", "sigA1", "muA2", "sigA2", "muB1", "sigB1", "muB2", "sigB2")],
-    "p"=sapply(split(Likelihood[, "Likelihood"], id2), sum)
-  )
-  
-  posteriori
-}
-
-posteriori_of_game <- function(players, score) {
-  if(is.na(score[, "joueur_A1"])) {
-    posteriori <- posteriori_1vs1(distr_mu_sig1 = players[[score[, "joueur_A2"]]],
-                                  distr_mu_sig2 = players[[score[, "joueur_B1"]]],
-                                  game_len = as.numeric(score[, "game_length"]),
-                                  win = as.numeric(score[, "win"]))
-    posteriori_per_player <- post_marginal_per_player(posteriori)
-    players[[score[, "joueur_A2"]]] <- posteriori_per_player[[1]]
-    players[[score[, "joueur_B1"]]] <- posteriori_per_player[[2]]
-    players
-  } else {
-    posteriori <- posteriori_2vs2(distr_mu_sigA1 = players[[score[, "joueur_A1"]]],
-                                  distr_mu_sigA2 = players[[score[, "joueur_A2"]]],
-                                  distr_mu_sigB1 = players[[score[, "joueur_B1"]]],
-                                  distr_mu_sigB2 = players[[score[, "joueur_B2"]]],
-                                  game_len = as.numeric(score[, "game_length"]),
-                                  win = as.numeric(score[, "win"]))
-    posteriori_per_player <- post_marginal_per_player(posteriori)
-    players[[score[, "joueur_A1"]]] <- posteriori_per_player[[1]]
-    players[[score[, "joueur_A2"]]] <- posteriori_per_player[[2]]
-    players[[score[, "joueur_B1"]]] <- posteriori_per_player[[3]]
-    players[[score[, "joueur_B2"]]] <- posteriori_per_player[[4]]
-    players
+  for(i in 1:5) {
+    M <- M %*% M
   }
+  
+  # prob que A gagne sachant que A sert +  prob que A gagne sachant que B sert.
+  0.5 * (M[3, 1]+ M[(k+1)+3, 2*(k+1)])
+}
+
+prob_win_point_2vs2_knowing_skills <- function(MA1, MA2, MB1, MB2, k = 3) {
+  
+  #A1->B1->A2->B2
+  M1 <- matrix(0, 4*nrow(MA1), 4*ncol(MA1), dimnames = list(
+    c(paste0("A1 ", rownames(MA1)), paste0("A2 ", rownames(MA2)), paste0("B1 ", rownames(MB1)), paste0("B2 ", rownames(MB2))),
+    c(paste0("B2 ", colnames(MB1)), paste0("B1 ", colnames(MB2)), paste0("A1 ", colnames(MA1)), paste0("A2 ", colnames(MA1)))
+  ))
+  
+  #A1->B2->A2->B1
+  M2 <- matrix(0, 4*nrow(MA1), 4*ncol(MA1), dimnames = list(
+    dimnames(M1)[[1]],
+    c(paste0("B1 ", colnames(MB1)), paste0("B2 ", colnames(MB2)), paste0("A2 ", colnames(MA1)), paste0("A1 ", colnames(MA1)))
+  ))
+  
+  
+  M1[1:nrow(MA1), ncol(MB1)+ncol(MB2) + 1:ncol(MA1)] <- MA1
+  M1[nrow(MA1) + 1:nrow(MA2), ncol(MB1)+ncol(MB2) + ncol(MA1) + 1:ncol(MA2)] <- MA2
+  M1[nrow(MA1) + nrow(MA2) + 1:nrow(MB1), ncol(MB2) + 1:ncol(MB1)] <- MB1
+  M1[nrow(MA1) + nrow(MA2) + nrow(MB2) + 1:nrow(MB2), 1:ncol(MB2)] <- MB2
+  
+  M2[1:nrow(MA1), ncol(MB1)+ncol(MB2)+ncol(MA2) + 1:ncol(MA1)] <- MA1
+  M2[nrow(MA1) + 1:nrow(MA2), ncol(MB1)+ncol(MB2) + 1:ncol(MA2)] <- MA2
+  M2[nrow(MA1) + nrow(MA2) + 1:nrow(MB1), 1:ncol(MB1)] <- MB1
+  M2[nrow(MA1) + nrow(MA2) + nrow(MB2) + 1:nrow(MB2), ncol(MB1) + 1:ncol(MB2)] <- MB2
+  
+  #eigen_info <- eigen(t(M1))
+  #round(Re(eigen_info$vectors %*% diag(eigen_info$values) %*% solve(eigen_info$vectors)), 1)
+  
+  for(i in 1:5) {
+    M1 <- M1 %*% M1
+    M2 <- M2 %*% M2
+  }
+  
+  0.25 * (M1[3, 1] + M1[k+1+3, k+1+1] + M1[2*(k+1)+3, 2*(k+1)+1] + M1[3*(k+1)+3, 3*(k+1)+1])+
+    0.25 * (M2[3, 1] + M1[k+1+3, k+1+1] + M1[2*(k+1)+3, 2*(k+1)+1] + M1[3*(k+1)+3, 3*(k+1)+1])
+  
+}
+
+posteriori_1vs1 <- function(distr_S1, distr_S2, game_len, win) {
+  
+  distr_S1_S2 <- distr_F1_F2_1vs1(distr_S1, distr_S2)
+  
+  MS1 <- rep(lapply(distr_S1[, "mu"] / 100, transition_matrix), nrow(distr_S2))
+  MS2 <- rep(lapply(distr_S2[, "mu"] / 100, transition_matrix), each = nrow(distr_S1))
+  
+  
+  distr_P <- cbind(mu1=distr_S1_S2[, "mu1"],
+                   mu2=distr_S1_S2[, "mu2"],
+                   #TODO vectoriser pour faire plusieurs games en même temps.
+                   #TODO weighter les games selon le nombre de jours passé avec (0.5^(1/121.67))^-x
+                   "P_1_wins_pt"=mapply(function(MS1, MS2) prob_win_point_1vs1_knowing_skills(MS1, MS2),
+         MS1, MS2),
+         "p_s1_s2" = distr_S1_S2[, "p1"] * distr_S1_S2[, "p2"]
+  )
+  
+  distr_P <- cbind(distr_P, "P_win_game" = p_win_game_of(distr_P[, "P_1_wins_pt"], game_len))
+  
+  Likelihood <- (distr_P[, "P_win_game"] * win + (1-distr_P[, "P_win_game"]) * (1-win)) * distr_P[, "p_s1_s2"]
+  Likelihood <- Likelihood/sum(Likelihood)
+  
+  posteriori <- cbind(
+    distr_P[, c("mu1", "mu2")],
+    "p"=Likelihood
+  )
+  
+  posteriori
+}
+
+
+posteriori_2vs2 <- function(distr_SA1, distr_SA2,
+                            distr_SB1, distr_SB2,
+                            game_len, win) {
+  
+  distr_SA1_SA2_SB1_SB2 <- distr_F1_F2_2vs2(distr_SA1, distr_SA2,
+                                  distr_SB1, distr_SB2)
+  
+  MSA1 <- rep(lapply(distr_SA1[, "mu"] / 100, transition_matrix),
+              nrow(distr_SA2) * nrow(distr_SB1) * nrow(distr_SB2))
+  MSA2 <- rep(rep(lapply(distr_SA2[, "mu"] / 100, transition_matrix),
+                  each = nrow(distr_SA1)), nrow(distr_SB1) * nrow(distr_SB2))
+  MSB1 <- rep(rep(lapply(distr_SB1[, "mu"] / 100, transition_matrix),
+                  each = nrow(distr_SA1) * nrow(distr_SA2)), nrow(distr_SB2))
+  MSB2 <- rep(lapply(distr_SB2[, "mu"] / 100, transition_matrix),
+                  each = nrow(distr_SA1) * nrow(distr_SA2) * nrow(distr_SB1))
+  
+  distr_P <- cbind(muA1=distr_SA1_SA2_SB1_SB2[, "muA1"],
+                   muA2=distr_SA1_SA2_SB1_SB2[, "muA2"],
+                   muB1=distr_SA1_SA2_SB1_SB2[, "muB1"],
+                   muB2=distr_SA1_SA2_SB1_SB2[, "muB2"],
+                   "P_A_wins_pt"=mapply(function(MSA1, MSA2, MSB1, MSB2) prob_win_point_2vs2_knowing_skills(MSA1, MSA2, MSB1, MSB2),
+                                        MSA1, MSA2, MSB1, MSB2),
+                   "p_sa1_sa2_sb1_sb2" = apply(distr_SA1_SA2_SB1_SB2[, c("pA1", "pA2", "pB1", "pB2")], 1, prod)
+  )
+  
+  distr_P <- cbind(distr_P, "P_win_game" = p_win_game_of(distr_P[, "P_A_wins_pt"], game_len))
+  
+  Likelihood <- (distr_P[, "P_win_game"] * win + (1-distr_P[, "P_win_game"]) * (1-win)) * distr_P[, "p_sa1_sa2_sb1_sb2"]
+  Likelihood <- Likelihood/sum(Likelihood)
+  Likelihood <- cbind(Likelihood, distr_P)
+  
+  posteriori <- cbind(
+    Likelihood[, c("muA1", "muA2", "muB1", "muB2")],
+    "p"=Likelihood[, "Likelihood"]
+  )
+  
+  posteriori
 }
 
 #TODO valider que ça marche bien
 posteriori_of_game_simplified <- function(players, score) {
   if(is.na(score[, "joueur_A1"])) {
     
-    tmp <- distr_simplifier_1vs1(players[[score[, "joueur_A2"]]], players[[score[, "joueur_B1"]]])
-    print(paste0("  ", tmp[["dim_mu"]]))
+    tmp <- distr_simplifier_1vs1(distr1 = players[[score[, "joueur_A2"]]],
+                                 distr2 = players[[score[, "joueur_B1"]]])
     
     probs_ignorees1 <- sum(players[[score[, "joueur_A2"]]][!tmp[["keep1"]], "p"])
     probs_ignorees2 <- sum(players[[score[, "joueur_B1"]]][!tmp[["keep2"]], "p"])
-    if(probs_ignorees1 > 0.02 | probs_ignorees2 > 0.02) warning(
-      paste0("prob élevée ", round(max(c(probs_ignorees1, probs_ignorees2)),3), collapse = " "
-      ))
     
-    posteriori <- posteriori_1vs1(distr_mu_sig1 = tmp[["distr1"]],
-                                  distr_mu_sig2 = tmp[["distr2"]],
+    if(probs_ignorees1 > 0.01 | probs_ignorees2 > 0.01) {
+      probs_ignorees1 <- 0
+      probs_ignorees2 <- 0
+      tmp <- list(keep1 = rep(T, length(tmp[["keep1"]])),
+                  keep2 = rep(T, length(tmp[["keep2"]])))
+    } else {
+      #print(paste0("  ", prod(sapply(tmp, sum))))
+    }
+    
+    posteriori <- posteriori_1vs1(distr_S1 = players[[score[, "joueur_A2"]]][tmp[["keep1"]], ],
+                                  distr_S2 = players[[score[, "joueur_B1"]]][tmp[["keep2"]], ],
                                   game_len = as.numeric(score[, "game_length"]),
-                                  win = as.numeric(score[, "win"]),
-                                  dim_mu = tmp[["dim_mu"]])
+                                  win = as.numeric(score[, "win"]))
     posteriori_per_player <- post_marginal_per_player(posteriori)
     
     posteriori_per_player[[1]][, "p"] <- posteriori_per_player[[1]][, "p"] * (1-probs_ignorees1)
@@ -276,39 +245,29 @@ posteriori_of_game_simplified <- function(players, score) {
     players
   } else {
     
-    tmp <- distr_simplifier_2vs2(players[[score[, "joueur_A1"]]], players[[score[, "joueur_A2"]]],
-                                 players[[score[, "joueur_B1"]]], players[[score[, "joueur_B2"]]])
-    print(paste0("  ", tmp[["dim_mu"]]))
+    #très lent donc on va davantage simplifier. discrétisation max de n.
+    distrA1 <- distr_simplifier_top_n(players[[score[, "joueur_A1"]]], 10)
+    distrA2 <- distr_simplifier_top_n(players[[score[, "joueur_A2"]]], 10)
+    distrB1 <- distr_simplifier_top_n(players[[score[, "joueur_B1"]]], 10)
+    distrB2 <- distr_simplifier_top_n(players[[score[, "joueur_B2"]]], 10)
     
-    probs_ignoreesA1 <- sum(players[[score[, "joueur_A1"]]][!tmp[["keepA1"]], "p"])
-    probs_ignoreesA2 <- sum(players[[score[, "joueur_A2"]]][!tmp[["keepA2"]], "p"])
-    probs_ignoreesB1 <- sum(players[[score[, "joueur_B1"]]][!tmp[["keepB1"]], "p"])
-    probs_ignoreesB2 <- sum(players[[score[, "joueur_B2"]]][!tmp[["keepB2"]], "p"])
-    
-    if(probs_ignoreesA1 > 0.02 | probs_ignoreesA2 > 0.02 |
-       probs_ignoreesB1 > 0.02 | probs_ignoreesB2 > 0.02) warning(
-         paste0("prob élevée ", round(max(c(probs_ignoreesA1,probs_ignoreesA2,probs_ignoreesB1,probs_ignoreesB2)), 3), collapse = " "
-                ))
-    
-    posteriori <- posteriori_2vs2(distr_mu_sigA1 = tmp[["distrA1"]],
-                                  distr_mu_sigA2 = tmp[["distrA2"]],
-                                  distr_mu_sigB1 = tmp[["distrB1"]],
-                                  distr_mu_sigB2 = tmp[["distrB2"]],
+    posteriori <- posteriori_2vs2(distr_SA1 = distrA1,
+                                  distr_SA2 = distrA2,
+                                  distr_SB1 = distrB1,
+                                  distr_SB2 = distrB2,
                                   game_len = as.numeric(score[, "game_length"]),
-                                  win = as.numeric(score[, "win"]),
-                                  dim_mu = tmp[["dim_mu"]])
+                                  win = as.numeric(score[, "win"]))
     posteriori_per_player <- post_marginal_per_player(posteriori)
     
+    posteriori_per_player[[1]] <- distr_unsimplifier_top_n(distr = posteriori_per_player[[1]], init_distr = players[[score[, "joueur_A1"]]], cap_factor = 1)
+    posteriori_per_player[[2]] <- distr_unsimplifier_top_n(distr = posteriori_per_player[[2]], init_distr = players[[score[, "joueur_A2"]]], cap_factor = 1)
+    posteriori_per_player[[3]] <- distr_unsimplifier_top_n(distr = posteriori_per_player[[3]], init_distr = players[[score[, "joueur_B1"]]], cap_factor = 1)
+    posteriori_per_player[[4]] <- distr_unsimplifier_top_n(distr = posteriori_per_player[[4]], init_distr = players[[score[, "joueur_B2"]]], cap_factor = 1)
     
-    posteriori_per_player[[1]][, "p"] <- posteriori_per_player[[1]][, "p"] * (1-probs_ignoreesA1)
-    posteriori_per_player[[2]][, "p"] <- posteriori_per_player[[2]][, "p"] * (1-probs_ignoreesA2)
-    posteriori_per_player[[3]][, "p"] <- posteriori_per_player[[3]][, "p"] * (1-probs_ignoreesB1)
-    posteriori_per_player[[4]][, "p"] <- posteriori_per_player[[4]][, "p"] * (1-probs_ignoreesB2)
-    
-    players[[score[, "joueur_A1"]]][tmp[["keepA1"]], ] <- as.matrix(posteriori_per_player[[1]])
-    players[[score[, "joueur_A2"]]][tmp[["keepA2"]], ] <- as.matrix(posteriori_per_player[[2]])
-    players[[score[, "joueur_B1"]]][tmp[["keepB1"]], ] <- as.matrix(posteriori_per_player[[3]])
-    players[[score[, "joueur_B2"]]][tmp[["keepB2"]], ] <- as.matrix(posteriori_per_player[[4]])
+    players[[score[, "joueur_A1"]]] <- as.matrix(posteriori_per_player[[1]])
+    players[[score[, "joueur_A2"]]] <- as.matrix(posteriori_per_player[[2]])
+    players[[score[, "joueur_B1"]]] <- as.matrix(posteriori_per_player[[3]])
+    players[[score[, "joueur_B2"]]] <- as.matrix(posteriori_per_player[[4]])
     
     players
   }
@@ -316,8 +275,16 @@ posteriori_of_game_simplified <- function(players, score) {
 
 update_scores <- function(players, scores) {
   for(i in 1:nrow(scores)) {
-    print(i)
+    print(paste0(i, ifelse(is.na(scores[i, "joueur_A1"]), " 1vs1", " 2vs2")))
     players <- posteriori_of_game_simplified(players, scores[i, ])
+    #plot(players$Éti)
+    #Sys.sleep(1.5)
+    if(max(sapply(players, function(distr) sum(distr[, "p"]))) > 1.0001) stop("Erreur de prob A")
+    players <- lapply(players, simplifier_domain)
+    #plot(players$Éti, col="red")
+    if(max(sapply(players, function(distr) sum(distr[, "p"]))) > 1.0001) stop("Erreur de prob A")
+    #Sys.sleep(1.5)
+    
   }
   players
 }
